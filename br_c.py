@@ -7,6 +7,7 @@ from mip import Model, xsum, BINARY, minimize, ConstrsGenerator, CutPool
 
 
 class SubTourCutGenerator(ConstrsGenerator):
+    """Класс для генерации границ для ТСП"""
     """Class to generate cutting planes for the TSP"""
     def __init__(self, Fl: List[Tuple[int, int]], x_, V_):
         self.F, self.x, self.V = Fl, x_, V_
@@ -31,47 +32,47 @@ class SubTourCutGenerator(ConstrsGenerator):
             model += cut
 
 
-n = 30  # number of points
+n = 30  # число городов
 V = set(range(n))
 seed(0)
-p = [(randint(1, 100), randint(1, 100)) for i in V]  # coordinates
-Arcs = [(i, j) for (i, j) in product(V, V) if i != j]
+p = [(randint(1, 100), randint(1, 100)) for i in V]  # координаты
+Arcs = [(i, j) for (i, j) in product(V, V) if i != j]  #пары городов
 
-# distance matrix
+# матрица расстояний
 c = [[round(sqrt((p[i][0]-p[j][0])**2 + (p[i][1]-p[j][1])**2)) for j in V] for i in V]
 
 model = Model()
 
-# binary variables indicating if arc (i,j) is used on the route or not
+# двоичные переменные, указывающие, испльзуется ли arc (i,j) на пути
 x = [[model.add_var(var_type=BINARY) for j in V] for i in V]
 
-# continuous variable to prevent subtours: each city will have a
-# different sequential id in the planned route except the first one
+# переменная для предотвращения подтуров (присвоение каждому городу
+# последовательного идентификатора
 y = [model.add_var() for i in V]
 
-# objective function: minimize the distance
+# минимизация расстояния (целевая функция)
 model.objective = minimize(xsum(c[i][j]*x[i][j] for (i, j) in Arcs))
 
-# constraint : leave each city only once
+# единоразовый выезд из города
 for i in V:
     model += xsum(x[i][j] for j in V - {i}) == 1
 
-# constraint : enter each city only once
+# единоразовый вьезд в город
 for i in V:
     model += xsum(x[j][i] for j in V - {i}) == 1
 
-# (weak) subtour elimination
-# subtour elimination
+# устранение подтуров
 for (i, j) in product(V - {0}, V - {0}):
     if i != j:
         model += y[i] - (n+1)*x[i][j] >= y[j]-n
 
-# no subtours of size 2
+# подтуры размерности 2
 for (i, j) in Arcs:
     model += x[i][j] + x[j][i] <= 1
 
-# computing farthest point for each point, these will be checked first for
-# isolated subtours
+# вычисляем самую дальнюю точку для каждой точки,
+# сначала проверены для изолированных подтуров
+
 F, G = [], nx.DiGraph()
 for (i, j) in Arcs:
     G.add_edge(i, j, weight=c[i][j])
